@@ -1,0 +1,127 @@
+---
+title: "lab1_practice"
+author: "Inez Mangino"
+format: 
+  html:
+    code-fold: true
+    toc: true
+execute:
+  echo: true
+  message: false
+  warning: false
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(gapminder)
+library(lmtest)
+library(olsrr)
+library(car)
+data(gapminder)
+```
+
+# Analysis part 1
+
+```{r}
+#average gdp by continent
+gapminder2 <- gapminder %>%
+  group_by(year, continent) %>%
+  summarize(avg_gdp = sum(gdpPercap * pop) / sum(pop))
+
+gapminder4 <- gapminder %>% 
+  group_by(continent) %>% 
+   summarize(avg_gdp = sum(gdpPercap * pop) / sum(pop))
+
+#average gpd by country
+gapminder3 <- gapminder %>%
+  group_by(year, continent, country) %>%
+  summarize(avg_gdp = sum(gdpPercap * pop) / sum(pop))
+
+#average continent gdp over time
+ggplot(gapminder2, aes(x = year, y = avg_gdp, color = continent)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Year", y = "Average GDP per capita", color = "Continent")
+
+#HELP: add the country level data to this plot but with a low alpha to fade them into the background
+ggplot(gapminder2, aes(x = year, y = avg_gdp, color = continent)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Year", y = "Average GDP per capita", color = "Continent") +
+  geom_jitter(data = gapminder3, alpha = 0.2)
+
+#log transform the avg_gdp variable
+gapminder2 <- gapminder2 %>%
+  mutate(log_avg_gdp = log(avg_gdp))
+
+#plot the log transformed data
+ggplot(gapminder2, aes(x = year, y = log_avg_gdp, color = continent)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Year", y = "Average GDP per capita", color = "Continent")
+```
+
+# Analysis part 2
+
+```{r}
+#lm of the regular gdp
+lm(gdpPercap ~ year + continent, data = gapminder) %>%
+  summary()
+
+#muatate in a log transformed gdpPercap into the gapminder dataframe
+gapminder <- gapminder %>%
+  mutate(log_gdpPercap = log(gdpPercap))
+
+#lm of the log transformed gdp
+lm(log_gdpPercap ~ year + continent, data = gapminder) %>%
+  summary()
+```
+
+# Follow-up questions
+
+## 1. Write a sentence or two describing the trends you see in the plots. Which model (log or not) did you choose and why? ###The log transformed data shows a more linear relationship between the year and the average GDP per capita. The log transformed data also has a higher R-squared value, which means that the model explains more of the variance in the data. I chose the log transformed data.
+
+## 2. Write a sentence or two to explain the coefficients on your linear model output, including statistical significance. ###Intercept: We predict an estimate for the log_gdpPercap value of -25.95 when the other predictors in the model (year and continent) are zero.
+
+### Our explanatory variables in this model include year and continent. They are used to predict the value of the response variable, GDP. The reference continent here is Africa. The year coefficient represents year: A 1 year increase in time results in a 0.016773 increase in log_gdpPercap.
+
+### The coefficients on each continent represent the difference in log_gdpPercap between the reference continent (Africa) and the continent in question. Yes, they seem to make intuitive sense. continentAmericas: in the Americas, on average the log_GDP increases by 1.366984 than in Africa continentAsia: \^ continentEurope: \^ continentOceania: \^
+
+## 3. Does a linear model seem like a good way to approach these data? Why or why not? ###Going through the assumptions of lm
+
+### a. linearity: when we transform the data, we see linear relationships between the dependent and independent vaiables
+
+### b. independence (we assume that the observations are independent of each other): HELP: Not sure how to test this?
+
+### c. homoscadasticity (the residuals are evenly distributed around the regression line): the test statistic is 221.99 and the corresponding p-value is significant at the 0.05 level, so we reject the null hypothesis of homoscedasticity. But when I plot the residuals V. the fitted it sort of looks like a concerning funnel shape that might indicate homoscedasticity.
+
+### d. normality (the residuals are normally distributed): the histogram and qq-plot of the residuals look normal.
+
+### e. no multicollinearity (the independent variables are not correlated with each other): HELP: do I need to check for this? is this a multivariate regression? I assume so. VIF values are all less than 5, so we can assume that there is no multicollinearity.
+
+```{r}
+#autocorrelation plot of the residuals
+gapminder %>%
+  ggplot(aes(x = year, y = resid(lm(log_gdpPercap ~ year + continent, data = gapminder)))) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Year", y = "Residuals")
+
+#test for homoscedasticity
+bptest(lm(log_gdpPercap ~ year + continent, data = gapminder)) 
+#the test statistic is 221.99 and the corresponding p-value is significant at the 0.05 level, so we reject the null hypothesis of homoscedasticity
+
+#plot residal versus fitted values
+ols_plot_resid_fit(lm(log_gdpPercap ~ year + continent, data = gapminder))
+
+#plot a histogram of the residuals
+ols_plot_resid_hist(lm(log_gdpPercap ~ year + continent, data = gapminder))
+
+#plot a qq plot of the residuals
+ols_plot_resid_qq(lm(log_gdpPercap ~ year + continent, data = gapminder))
+
+#check for multicollinearity with VIF test
+vif(lm(log_gdpPercap ~ year + continent, data = gapminder))
+
+```
